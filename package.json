@@ -1,0 +1,52 @@
+{
+  "name": "vue-dropdown-tree-select",
+  "version": "1.0.0",
+  "author": "Gilad Shohat",
+  "description": "Lightweight, customizable and fast Dropdown Tree Select component for Vue",
+  "homepage": "https://github.com/gshohat/vue-dropdown-tree-select#readme",
+  "license": "MIT",
+  "main": "./dist/dropdown-tree-select.umd.js",
+  "module": "./dist/dropdown-tree-select.es.js",
+  "files": [
+    "dist"
+  ],
+  "exports": {
+    ".": {
+      "import": "./dist/dropdown-tree-select.es.js",
+      "require": "./dist/dropdown-tree-select.umd.js"
+    },
+    "./dist/style.css": "./dist/style.css"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "vue": "^3.3.4"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^4.2.3",
+    "path": "^0.12.7",
+    "vite": "^4.4.6"
+  },
+  "keywords": [
+    "vue",
+    "component",
+    "tree-select",
+    "dropdown",
+    "dropdown-tree-select",
+    "react-dropdown-tree-select",
+    "checkbox-tree",
+    "checkbox-select",
+    "checkbox-tree-select",
+    "checkbox-dropdown-tree-select",
+    "fast",
+    "customizable",
+    "lightweight",
+    "searchable",
+    "search"
+  ]
+}
+
+
