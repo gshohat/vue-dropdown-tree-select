@@ -5,6 +5,7 @@
 **Lightweight** component for displaying hierarchical data **< 5k** 😎 <br>
 Emits selections to parent component
 
+![dropdown-tree-select](https://github.com/gshohat/vue-dropdown-tree-select/assets/91323932/f02d53c2-1551-4dc1-a2bb-c3ef8f377cfc)
 
 ## Usage
 
