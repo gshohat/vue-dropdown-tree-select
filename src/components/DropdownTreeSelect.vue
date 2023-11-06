@@ -1,220 +1,246 @@
 <script setup>
+import {onMounted, ref, toRaw} from 'vue';
 
+const props = defineProps(['items']);
+const emit = defineEmits(['change-selections']);
 
-import {onMounted, ref} from 'vue';
-
-
-const preview = ref('initial');
-const previewElement = ref(null);
-// const contentEditableElement = ref(null);
-let contentEditableElement = null;
-let spanElement = null;
-let scopedAttributeName;
-
-let styles = {
-  bold: {
-    isActive: false,
-    tagName: 'b',
-  },
-  italic: {
-    isActive: false,
-    tagName: 'em'
-  },
-  underline: {
-    isActive: false,
-    tagName: 'u',
-  },
-  delete: {
-    isActive: false,
-    tagName: 'del',
-  },
-  code: {
-    isActive: false,
-    tagName: 'code',
-  },
-};
-
+const selections = ref([]);
+let leafElementsSelections = {};
+let treeDomElement = null;
 
 onMounted(() => {
-  scopedAttributeName = document.querySelector('.content-editable').getAttributeNames()
-      .find(attributeName => attributeName.includes('data-v'));
+  treeDomElement = document.querySelector('.tree');
 
-  // let pElement = document.createElement('p');
-  // pElement.classList.add('partial-text');
-  contentEditableElement = document.getElementById('content-editable');
-  createStyledSpanElement(contentEditableElement);
-  // contentEditableElement.appendChild(pElement);
+  let rootTreeElement = document.createElement('div');
+
+  createTree(props.items, rootTreeElement);
+  treeDomElement.appendChild(rootTreeElement);
 });
 
-function createStyledSpanElement(contentEditableElement) {
-  let spanElement = document.createElement('span');
-  spanElement.setAttribute(scopedAttributeName, '');
-  spanElement.classList.add('partial-text');
-  // contentEditableElement = document.getElementById('content-editable');
-  contentEditableElement.appendChild(spanElement);
-}
+function createTree(items, element) {
+  for (const item of items) {
+    if (item.groupLabel) {
+      const nestedGroupElement = document.createElement('div');
+      nestedGroupElement.classList.add('group');
+      nestedGroupElement.style.paddingLeft = `1rem`;
+      nestedGroupElement.addEventListener('group-nested-leaf-change', handleNestedLeafChange);
 
-function handleMouseDown(event) {
-  event.preventDefault();
+      const plusElement = document.createElement('span');
+      plusElement.innerText = '+';
+      plusElement.style.paddingRight = `0.1rem`;
+      plusElement.addEventListener('click', handleToggleChildrenVisibility);
+      nestedGroupElement.appendChild(plusElement);
 
-}
+      const checkboxElement = document.createElement('input');
+      checkboxElement.type = 'checkbox';
+      checkboxElement.addEventListener('change', handleGroupChange);
 
-function handleClick(event) {
-  const styleName = event.currentTarget.getAttribute('id');
-  createStyledSpanElement(contentEditableElement);
-  styles[styleName].isActive = !styles[styleName].isActive;
-  toggleStyleButtonBackground(styles[styleName].isActive, event);
 
-  const stylesActiveNames = Object.keys(styles).filter(
-      styleName => styles[styleName].isActive
-  );
+      nestedGroupElement.appendChild(checkboxElement);
 
-  let lastNestedElement = null;
-  for (const styleActiveName of stylesActiveNames) {
-    const nestedElements = document.querySelectorAll('.partial-text');
-    const lastNestedElement = nestedElements[nestedElements.length - 1];
+      const nestedGroupNameElement = document.createElement('span');
+      nestedGroupNameElement.innerText = item.groupLabel;
+      nestedGroupNameElement.style.paddingLeft = `0.1rem`;
 
-    const element = document.createElement(styles[styleActiveName].tagName);
-    element.setAttribute(scopedAttributeName, '');
-    element.classList.add('partial-text');
+      nestedGroupElement.appendChild(nestedGroupNameElement);
 
-    lastNestedElement.appendChild(element);
+      element.appendChild(nestedGroupElement);
+
+      const nestedGroupChildrenElement = document.createElement('div');
+      nestedGroupChildrenElement.classList.add('group-children');
+      nestedGroupElement.appendChild(nestedGroupChildrenElement);
+
+
+      createTree(item.children, nestedGroupChildrenElement);
+    } else {
+      const leafElement = document.createElement('div');
+      leafElement.classList.add('leaf');
+      leafElement.style.paddingLeft = `1.7rem`;
+
+      const checkboxElement = document.createElement('input');
+      checkboxElement.type = 'checkbox';
+      leafElement.appendChild(checkboxElement);
+
+      const leafElementName = document.createElement('span');
+      leafElementName.innerText = item.label;
+      leafElementName.style.paddingLeft = '0.1rem';
+      leafElementName.setAttribute('value', item.value);
+      leafElement.appendChild(leafElementName);
+
+      checkboxElement.addEventListener('change', handleChange);
+
+      element.appendChild(leafElement);
+    }
   }
-  moveCaretToLast(contentEditableElement);
 }
 
-function toggleStyleButtonBackground(state, event) {
-  if (state)
-    event.currentTarget.classList.add('active');
-  else
-    event.currentTarget.classList.remove('active');
+function handleChange(event) {
+  const spanElement = event.currentTarget.parentNode.childNodes[1];
+  const label = spanElement.textContent;
+  const value = spanElement.getAttribute('value');
+  if (event.currentTarget.checked) {
+    selections.value.push({label, value});
+    leafElementsSelections[value] = event.currentTarget.parentNode;
+  }
+  else {
+    removeSelection(value);
+  }
+  event.currentTarget.dispatchEvent(groupNestedLeafChangeEvent);
+
+  emit('change-selections', toRaw(selections.value));
 }
 
-function moveCaretToLast(contentEditableElement) {
-  const nestedElements = document.querySelectorAll('.partial-text');
-  const lastNestedElementPartial = nestedElements[nestedElements.length - 1];
-
-  let range = document.createRange();
-  range.selectNodeContents(lastNestedElementPartial);
-  range.collapse(false);
-  let selection = window.getSelection();
-  selection.removeAllRanges();
-  selection.addRange(range);
+function removeSelection(value) {
+  selections.value = toRaw(selections.value).filter(selection => selection.value !== value );
 }
 
-function handleFocus(event) {
-  event.preventDefault();
-  moveCaretToLast(contentEditableElement);
+function handleNestedLeafChange(event) {
+  const groupChildrenArray = Array.from(event.currentTarget.childNodes[3].childNodes);
+  const filteredGroupChildrenArray = groupChildrenArray.filter((groupChild) => {
+    return ( (groupChild.classList.contains('leaf')) && (groupChild.childNodes[0].checked) ||
+        (groupChild.classList.contains('group')) && (groupChild.childNodes[1].checked) )
+  });
+  if (filteredGroupChildrenArray.length < groupChildrenArray.length)
+    event.currentTarget.childNodes[1].checked = false
+  else if (filteredGroupChildrenArray.length === groupChildrenArray.length)
+    event.currentTarget.childNodes[1].checked = true;
+}
+
+function handleToggleChildrenVisibility(event) {
+  const groupChildrenElement = event.currentTarget.parentNode.childNodes[3];
+  groupChildrenElement.style.display === 'none' ? groupChildrenElement.style.display = 'block' : groupChildrenElement.style.display = 'none';
+}
+
+const groupNestedLeafChangeEvent = new Event('group-nested-leaf-change', {bubbles: true});
+
+function allGroupDeselected(element) {
+  const arr = Array.from(element.childNodes);
+
+  const selectedLeafElements = arr.filter((childNode, index) => {
+    return ((index >= 3) && (childNode.childNodes[0].checked))
+  });
+  return selectedLeafElements.length === 0;
+}
+
+function handleGroupChange(event) {
+  toggleNestedSelections(event.currentTarget.checked, event.currentTarget.parentNode.childNodes);
+}
+
+function toggleNestedSelections(checked, childNodes) {
+  for (const childElement of childNodes) {
+    if (childElement.className === 'leaf') {
+      const checkBoxElement =  childElement.childNodes[0];
+      if (checkBoxElement.checked === checked)
+        continue;
+      const spanElement = checkBoxElement.parentNode.childNodes[1];
+      const value = spanElement.getAttribute('value');
+      if (checked) {
+        const label = spanElement.textContent;
+        selections.value.push({label, value});
+        leafElementsSelections[value] = checkBoxElement.parentNode;
+      }
+      else
+        removeSelection(value);
+      checkBoxElement.checked = checked;
+    } else if (childElement.className === 'group') {
+      const checkBoxElement = childElement.childNodes[1];
+      checkBoxElement.checked = checked;
+      toggleNestedSelections(checked, childElement.childNodes[3].childNodes);
+    } else if (childElement.className === 'group-children') {
+      toggleNestedSelections(checked, childElement.childNodes);
+    }
+  }
+}
+
+function handleRemoveSelection(event) {
+  const index = event.currentTarget.parentNode.attributes['data-index'].value;
+  const value = event.currentTarget.parentNode.attributes['data-value'].value;
+  selections.value.splice(index, 1);
+
+  const leafElementSelected = leafElementsSelections[value];
+  leafElementSelected.childNodes[0].checked = false;
+  leafElementSelected.dispatchEvent(groupNestedLeafChangeEvent);
+}
+
+function toggleTreeVisibility(event) {
+  if (event.currentTarget.innerHTML === '▼') {
+    event.currentTarget.innerHTML = '▲'
+    treeDomElement.style.visibility = 'visible';
+  } else {
+    event.currentTarget.innerHTML = '▼'
+    treeDomElement.style.visibility = 'hidden';
+  }
 }
 
 </script>
 
 <template>
+  <!--  <div>-->
+  <div class="selections">
+      <span v-for="(selection, index) in selections" class="item-selected" :data-index="index" :data-value="selection.value">
+        {{selection.label}}
+        <span class="remove-item" @click="handleRemoveSelection">x</span>
+      </span>
 
-  <div class="editor">
-    <div class="font-styles">
-      <!--      enum bold-->
-      <button class="style-button" id="bold"
-              @click="handleClick"
-              @mousedown="handleMouseDown">
-        B
-      </button>
-      <button
-          class="style-button" id="italic"
-          @click="handleClick"
-          @mousedown="handleMouseDown">
-        <em>I</em>
-      </button>
-      <button
-          class="style-button" id="delete"
-          @click="handleClick"
-          @mousedown="handleMouseDown">
-        <del>S</del>
-      </button>
-      <!--      <button-->
-      <!--          class="style-button" id="code"-->
-      <!--          @click="handleClick"-->
-      <!--          @mousedown="handleMouseDown">-->
-      <!--        {}-->
-      <!--      </button>-->
-      <button
-          class="style-button" id="underline"
-          @click="handleClick"
-          @mousedown="handleMouseDown">
-        <u>U</u>
-      </button>
+    <div class="arrow-container">
+      <div class="arrow-vertical-container">
+        <span class="arrow" @click="toggleTreeVisibility">&#9660;</span>
+      </div>
     </div>
-
-
-    <div id="content-editable" class="content-editable" contenteditable="true" @focus="handleFocus">
-    </div>
-
   </div>
 
-  <!--  <div class="preview" ref="previewElement">-->
-  <!--    &lt;p&gt; {{ preview }} &lt;/p&gt-->
-  <!--  </div>-->
+  <div class="tree" style="visibility: hidden"/>
 
 </template>
 
+
 <style scoped>
 
+.selections {
+  border: solid 1px grey;
+  padding: 1rem;
+  width: 30rem;
+  overflow: scroll;
+  flex: 0 0 6rem;
+  display: flex;
+  gap: 1rem;
+}
 
+.item-selected {
+  padding: 0.5rem;
+  margin: 0.5rem;
+  background-color: grey;
+  white-space: nowrap;
+}
 
-.style-button {
-  width: 10em;
-  height: 5ex;
-  background-color: #e9e9ed;
-  font-weight: bold;
-  color: black;
+.remove-item {
+  color: #34495e6e;
+  font-size: 1.2em;
+  padding-left: 0.2rem;
+}
+
+.remove-item:hover {
   cursor: pointer;
 }
 
-.active {
-  background-color: rgba(233, 233, 237, 0.85);
+.arrow-container {
+  flex: 1;
+  display: flex;
+  justify-content: end;
 }
 
-
-.editor {
+.arrow-vertical-container {
   display: flex;
   flex-direction: column;
-  gap: 1rem;
-  border: solid 1px;
-  padding: 1rem;
+  justify-content: center;
 }
 
-
-
-.font-styles {
-  display: flex;
-  max-width: 160px;
+.arrow:hover {
+  cursor: pointer;
 }
 
-.font-style {
-  flex: 1;
-}
-
-.preview {
-  border: solid 1px #34495e;
-  padding: 1rem;
-  color: #41b883;
-}
-
-.content-editable {
-  min-height: 3rem;
-  background-color: white;
-  color: black;
-  padding: 0.2rem;
-  white-space: pre-wrap;
-}
-
-
-.content-editable:focus {
-  outline: none;
-}
-
-.partial-text {
-  display: inline-flex;
+.tree {
+  flex: 2;
 }
 
 </style>
