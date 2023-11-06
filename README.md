@@ -11,7 +11,7 @@ Emits selections to parent component
 `npm i vue-dropdown-tree-select`
 
 ```
-<script setup>
+<script setup>π
 import DropdownTreeSelect from 'vue-dropdown-tree-select';
 import 'vue-dropdown-tree-select/dist/style.css';
 
